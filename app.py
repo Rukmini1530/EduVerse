@@ -32,7 +32,10 @@ body {background-color: #F5F2FF;}
 </style>
 """, unsafe_allow_html=True)
 
-st.image(".assets/puppy.png", width=80)
+if os.path.exists("assets/puppy.png"):
+    st.image("assets/puppy.png", width=80)
+else:
+    st.warning("🐶 Image not found")
 st.title("EduVerse 💜")
 
 QUIZ_FILE = "quiz.json"
