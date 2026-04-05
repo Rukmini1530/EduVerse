@@ -32,7 +32,7 @@ body {background-color: #F5F2FF;}
 </style>
 """, unsafe_allow_html=True)
 
-st.image("assets/puppy.png", width=80)
+st.image(".assets/puppy.png", width=80)
 st.title("EduVerse 💜")
 
 QUIZ_FILE = "quiz.json"
