@@ -9,7 +9,7 @@ import os
 st.set_page_config(page_title="EduVerse", layout="centered")
 
 # -----------------------------
-# 🎨 PURPLE UI THEME
+# 🎨 UI
 # -----------------------------
 st.markdown("""
 <style>
@@ -21,99 +21,130 @@ body {background-color: #F5F2FF;}
     border-radius: 20px;
     padding: 20px;
     margin: 10px 0;
-    box-shadow: 0px 8px 20px rgba(0,0,0,0.08);
 }
 
 .stButton button {
     background-color: #6C4DF6;
     color: white;
     border-radius: 12px;
-    padding: 10px;
-    font-weight: bold;
     width: 100%;
-}
-
-.stButton button:hover {
-    background-color: #5B3FD4;
-}
-
-.level-circle {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: #6C4DF6;
-    color: white;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    margin: 5px;
-}
-
-.locked {background: #CFC8FF;}
-
-.progress-bar {
-    height: 10px;
-    background: #E5DEFF;
-    border-radius: 10px;
-}
-
-.progress-fill {
-    height: 10px;
-    background: #6C4DF6;
-    border-radius: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# 🐶 HEADER
-# -----------------------------
-st.image("puppy.png", width=80)
+st.image("assets/puppy.png", width=80)
 st.title("EduVerse 💜")
 
 QUIZ_FILE = "quiz.json"
 PROGRESS_FILE = "progress.json"
 
 # -----------------------------
-# MCQ GENERATOR
+# 🧠 ADVANCED GENERATOR
 # -----------------------------
 def generate_mcqs(text):
-    sentences = re.split(r'\.|\n', text)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 30]
+
+    text = text.replace("\n", " ")
+
+    sentences = re.split(r'[.!?]', text)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 40]
+
+    random.shuffle(sentences)
 
     questions = []
+    topics = {}
 
-    for s in sentences[:5]:
+    for s in sentences:
+
         words = s.split()
-        important_words = [w for w in words if len(w) > 4]
+        keywords = [w for w in words if len(w) > 5]
 
-        if not important_words:
+        if not keywords:
             continue
 
-        answer = random.choice(important_words)
+        answer = random.choice(keywords)
+
+        topic = answer.lower()
+        topics.setdefault(topic, []).append(s)
+
+        # -------------------
+        # MCQ
+        # -------------------
         question = s.replace(answer, "_____")
 
         options = [answer]
-        random_words = list(set(text.split()))
-        random.shuffle(random_words)
+        pool = list(set(text.split()))
+        random.shuffle(pool)
 
-        for w in random_words:
-            if w != answer and len(options) < 4 and len(w) > 4:
+        for w in pool:
+            if w != answer and len(w) > 4 and len(options) < 4:
                 options.append(w)
 
         random.shuffle(options)
 
         questions.append({
+            "type": "mcq",
             "question": question,
             "options": options,
             "answer": answer,
-            "explanation": f"The correct word is '{answer}'."
+            "explanation": f"{answer} is an important concept."
+        })
+
+        # -------------------
+        # TRUE/FALSE
+        # -------------------
+        if random.random() > 0.5:
+            false_word = random.choice(pool)
+            tf_q = s.replace(answer, false_word)
+
+            questions.append({
+                "type": "tf",
+                "question": tf_q,
+                "options": ["True", "False"],
+                "answer": "False",
+                "explanation": f"Correct term is {answer}"
+            })
+        else:
+            questions.append({
+                "type": "tf",
+                "question": s,
+                "options": ["True", "False"],
+                "answer": "True",
+                "explanation": "Statement is correct"
+            })
+
+        # -------------------
+        # FLASHCARD
+        # -------------------
+        questions.append({
+            "type": "flashcard",
+            "question": f"What is {answer}?",
+            "answer": s,
+            "options": [],
+            "explanation": s
+        })
+
+        if len(questions) >= 15:
+            break
+
+    # -------------------
+    # MATCH THE FOLLOWING
+    # -------------------
+    match_pairs = []
+
+    for k, v in list(topics.items())[:5]:
+        match_pairs.append((k, v[0][:50]))
+
+    if match_pairs:
+        questions.append({
+            "type": "match",
+            "pairs": match_pairs
         })
 
     return questions
 
+
 # -----------------------------
-# TEXT EXTRACTION
+# TEXT
 # -----------------------------
 def extract_text(file):
     reader = PyPDF2.PdfReader(file)
@@ -121,6 +152,7 @@ def extract_text(file):
     for page in reader.pages:
         text += page.extract_text() or ""
     return text
+
 
 # -----------------------------
 # SAVE / LOAD
@@ -135,8 +167,9 @@ def load_json(file, default):
             return json.load(f)
     return default
 
+
 # -----------------------------
-# INIT DATA
+# INIT
 # -----------------------------
 progress = load_json(PROGRESS_FILE, {
     "index": 0,
@@ -149,62 +182,26 @@ progress = load_json(PROGRESS_FILE, {
 })
 
 # -----------------------------
-# 🔥 STREAK LOGIC
+# STREAK
 # -----------------------------
 today = str(date.today())
 
 if progress["last_played"] != today:
-    yesterday = str(date.fromordinal(date.today().toordinal() - 1))
-
-    if progress["last_played"] == yesterday:
-        progress["streak"] += 1
-    else:
-        progress["streak"] = 1
-
+    progress["streak"] += 1
     progress["last_played"] = today
     save_json(PROGRESS_FILE, progress)
 
 questions = load_json(QUIZ_FILE, [])
 
 # -----------------------------
-# 📊 DISPLAY
+# DISPLAY
 # -----------------------------
 st.write(f"⭐ XP: {progress['xp']} | 🏆 Level: {progress['level']}")
 st.write("❤️ " * progress["hearts"])
 st.write(f"🔥 Streak: {progress['streak']}")
 
-xp_progress = progress["xp"] % 100
-
-st.markdown(
-    f"""
-    <div class="progress-bar">
-        <div class="progress-fill" style="width:{xp_progress}%"></div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
 # -----------------------------
-# 🗺️ LEVEL PATH
-# -----------------------------
-st.subheader("Learning Path")
-
-cols = st.columns(5)
-
-for i in range(5):
-    if i + 1 <= progress["level"]:
-        cols[i].markdown(
-            f"<div class='level-circle'>{i+1}</div>",
-            unsafe_allow_html=True
-        )
-    else:
-        cols[i].markdown(
-            f"<div class='level-circle locked'>🔒</div>",
-            unsafe_allow_html=True
-        )
-
-# -----------------------------
-# 📄 UPLOAD
+# UPLOAD
 # -----------------------------
 uploaded = st.file_uploader("Upload PDF", type=["pdf"])
 
@@ -220,10 +217,10 @@ if uploaded:
 
     save_json(PROGRESS_FILE, progress)
 
-    st.success("New Quiz Ready 🎉")
+    st.success("Quiz Ready 🚀")
 
 # -----------------------------
-# 🎮 QUIZ
+# QUIZ ENGINE
 # -----------------------------
 if questions:
 
@@ -235,56 +232,59 @@ if questions:
 
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        st.write(f"### Q{index+1}")
-        st.write(q["question"])
+        # -------------------
+        # MCQ / TF
+        # -------------------
+        if q["type"] in ["mcq", "tf"]:
 
-        ans = st.radio("Choose:", q["options"], key=index)
+            st.write(q["question"])
+            ans = st.radio("Choose:", q["options"], key=index)
 
-        if st.button("Submit"):
+            if st.button("Submit"):
 
-            if ans == q["answer"]:
-                st.success("🐶 Correct!")
-                progress["score"] += 1
-                progress["xp"] += 20
+                if ans == q["answer"]:
+                    st.success("Correct!")
+                    progress["xp"] += 20
+                    progress["score"] += 1
+                else:
+                    st.error("Wrong!")
+                    progress["hearts"] -= 1
 
-            else:
-                st.error("Wrong!")
-                st.write(q["explanation"])
+                progress["index"] += 1
+                save_json(PROGRESS_FILE, progress)
+                st.rerun()
 
-                progress["hearts"] -= 1
+        # -------------------
+        # FLASHCARD
+        # -------------------
+        elif q["type"] == "flashcard":
 
-                if progress["hearts"] <= 0:
-                    st.error("💔 Game Over!")
+            st.write(q["question"])
 
-                    if st.button("Restart"):
-                        progress["index"] = 0
-                        progress["score"] = 0
-                        progress["hearts"] = 3
-                        save_json(PROGRESS_FILE, progress)
-                        st.rerun()
+            if st.button("Show Answer"):
+                st.info(q["answer"])
 
-                    st.stop()
+                if st.button("Next"):
+                    progress["index"] += 1
+                    save_json(PROGRESS_FILE, progress)
+                    st.rerun()
 
-            progress["index"] += 1
+        # -------------------
+        # MATCH
+        # -------------------
+        elif q["type"] == "match":
 
-            if progress["xp"] >= 100:
-                progress["level"] += 1
-                progress["xp"] = 0
-                st.success("🏆 Level Up!")
+            st.write("Match the following:")
 
-            save_json(PROGRESS_FILE, progress)
+            for pair in q["pairs"]:
+                st.write(f"{pair[0]}  →  {pair[1]}")
 
-            st.rerun()
+            if st.button("Next"):
+                progress["index"] += 1
+                save_json(PROGRESS_FILE, progress)
+                st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
     else:
-        st.subheader("🎉 Quiz Completed!")
-        st.write(f"Score: {progress['score']} / {len(questions)}")
-
-        if st.button("Restart"):
-            progress["index"] = 0
-            progress["score"] = 0
-            progress["hearts"] = 3
-            save_json(PROGRESS_FILE, progress)
-            st.rerun()
+        st.success("🎉 Completed!")
